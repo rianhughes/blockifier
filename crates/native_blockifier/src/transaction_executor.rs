@@ -68,7 +68,7 @@ impl<S: StateReader> TransactionExecutor<S> {
         let tx: Transaction = py_tx(tx, raw_contract_class)?;
 
         let mut tx_executed_class_hashes = HashSet::<ClassHash>::new();
-        let mut transactional_state = CachedState::create_transactional(&mut self.state);
+        let mut transactional_state = TransactionalState::new_transactional(&mut self.state);
         let validate = true;
         let tx_execution_result = tx
             .execute_raw(&mut transactional_state, &self.block_context, charge_fee, validate)
@@ -177,7 +177,7 @@ impl<S: StateReader> TransactionExecutor<S> {
 
 /// Returns the estimated VM resources for Casm hash calculation (done by the OS), of the newly
 /// executed classes by the current transaction.
-pub fn get_casm_hash_calculation_resources<S: StateReader>(
+pub fn get_casm_hash_calculation_resources<S: State>(
     state: &mut TransactionalState<'_, S>,
     executed_class_hashes: &HashSet<ClassHash>,
     tx_executed_class_hashes: &HashSet<ClassHash>,

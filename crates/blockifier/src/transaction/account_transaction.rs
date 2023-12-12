@@ -18,7 +18,7 @@ use crate::fee::fee_checks::{FeeCheckReportFields, PostExecutionReport};
 use crate::fee::fee_utils::{get_fee_by_l1_gas_usage, verify_can_pay_committed_bounds};
 use crate::fee::gas_usage::estimate_minimal_l1_gas;
 use crate::retdata;
-use crate::state::cached_state::{CachedState, TransactionalState};
+use crate::state::cached_state::{TransactionalState};
 use crate::state::state_api::{State, StateReader};
 use crate::transaction::constants;
 use crate::transaction::errors::{
@@ -323,7 +323,7 @@ impl AccountTransaction {
         }
     }
 
-    fn run_non_revertible<S: StateReader>(
+    fn run_non_revertible<S: State>(
         &self,
         state: &mut TransactionalState<'_, S>,
         account_tx_context: &AccountTransactionContext,
@@ -399,7 +399,7 @@ impl AccountTransaction {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn run_revertible<S: StateReader>(
+    fn run_revertible<S: State>(
         &self,
         state: &mut TransactionalState<'_, S>,
         account_tx_context: &AccountTransactionContext,
@@ -436,7 +436,7 @@ impl AccountTransaction {
         // Create copies of state and resources for the execution.
         // Both will be rolled back if the execution is reverted or committed upon success.
         let mut execution_resources = resources.clone();
-        let mut execution_state = CachedState::create_transactional(state);
+        let mut execution_state = TransactionalState::new_transactional(state);
 
         let execution_result = self.run_execute(
             &mut execution_state,
@@ -536,7 +536,7 @@ impl AccountTransaction {
     }
 
     /// Runs validation and execution.
-    fn run_or_revert<S: StateReader>(
+    fn run_or_revert<S: State>(
         &self,
         state: &mut TransactionalState<'_, S>,
         remaining_gas: &mut u64,
@@ -572,7 +572,7 @@ impl AccountTransaction {
     }
 }
 
-impl<S: StateReader> ExecutableTransaction<S> for AccountTransaction {
+impl<S: State> ExecutableTransaction<S> for AccountTransaction {
     fn execute_raw(
         self,
         state: &mut TransactionalState<'_, S>,

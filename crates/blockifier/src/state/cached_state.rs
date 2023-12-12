@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -7,6 +8,7 @@ use indexmap::IndexMap;
 use starknet_api::core::{ClassHash, CompiledClassHash, ContractAddress, Nonce};
 use starknet_api::hash::StarkFelt;
 use starknet_api::state::StorageKey;
+use starknet_crypto::FieldElement;
 
 use crate::abi::abi_utils::get_fee_token_var_address;
 use crate::execution::contract_class::ContractClass;
@@ -42,14 +44,6 @@ impl<S: StateReader> CachedState<S> {
             class_hash_to_class: HashMap::default(),
             global_class_hash_to_class,
         }
-    }
-
-    /// Creates a transactional instance from the given cached state.
-    /// It allows performing buffered modifying actions on the given state, which
-    /// will either all happen (will be committed) or none of them (will be discarded).
-    pub fn create_transactional(state: &mut CachedState<S>) -> TransactionalState<'_, S> {
-        let global_class_hash_to_class = state.global_class_hash_to_class.clone();
-        CachedState::new(MutRefState::new(state), global_class_hash_to_class)
     }
 
     /// Returns the storage changes done through this state.
@@ -584,10 +578,10 @@ impl<'a, S: State + ?Sized> State for MutRefState<'a, S> {
     }
 }
 
-pub type TransactionalState<'a, S> = CachedState<MutRefState<'a, CachedState<S>>>;
+pub type TransactionalState<'a, S> = CachedState<MutRefState<'a, S>>;
 
 /// Adds the ability to perform a transactional execution.
-impl<'a, S: StateReader> TransactionalState<'a, S> {
+impl<'a, S: State> TransactionalState<'a, S> {
     // Detach `state`, moving the instance to a pending state, which can be committed or aborted.
     pub fn stage(self, tx_executed_class_hashes: HashSet<ClassHash>) -> StagedTransactionalState {
         let TransactionalState { cache, class_hash_to_class, global_class_hash_to_class, .. } =
@@ -604,13 +598,41 @@ impl<'a, S: StateReader> TransactionalState<'a, S> {
     pub fn commit(self) {
         let state = self.state.0;
         let child_cache = self.cache;
-        state.update_cache(child_cache);
-        state
-            .update_contract_class_caches(self.class_hash_to_class, self.global_class_hash_to_class)
+
+        child_cache.nonce_writes.iter().for_each( | (contract_address, nonce) | {
+            let previous_nonce = state.get_nonce_at(*contract_address).expect("Getting current nonce");
+            let previous_nonce_ff: FieldElement = previous_nonce.0.into();
+            let current_nonce_ff: FieldElement = nonce.0.into();
+            let mut increments = current_nonce_ff - previous_nonce_ff;
+
+            while increments.cmp(&FieldElement::ZERO) == Ordering::Greater {
+                state.increment_nonce(*contract_address).expect("Incrementing nonce");
+                increments = increments - FieldElement::ONE;
+            }
+        });
+        child_cache.class_hash_writes.iter().for_each( | (contract_address, class_hash) | {
+            state.set_class_hash_at(*contract_address, *class_hash).expect("Committing class_hash_writes")
+        });
+        child_cache.storage_writes.iter().for_each( | (storage_address, value) | {
+            state.set_storage_at(storage_address.0, storage_address.1, *value);
+        });
+        child_cache.compiled_class_hash_writes.iter().for_each( | (class_hash, compiled_class_hash) | {
+            state.set_compiled_class_hash(*class_hash, *compiled_class_hash).expect("Committing compiled_class_hash_writes");
+        });
+        self.class_hash_to_class.iter().for_each( | (class_hash, contract_class) | {
+            state.set_contract_class(class_hash, contract_class.clone()).expect("Committing class_hash_to_class");
+        });
     }
 
     /// Drops `self`.
     pub fn abort(self) {}
+
+    /// Creates a transactional instance from the given state.
+    /// It allows performing buffered modifying actions on the given state, which
+    /// will either all happen (will be committed) or none of them (will be discarded).
+    pub fn new_transactional(state: &mut S) -> TransactionalState<'_, S> {
+        CachedState::new(MutRefState::new(state), GlobalContractCache::default())
+    }
 }
 
 /// Represents the interim state, containing the changes made by a transaction after execution but
