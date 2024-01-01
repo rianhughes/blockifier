@@ -229,12 +229,12 @@ impl<S: StateReader> StateReader for CachedState<S> {
 
             match contract_class {
                 Some(contract_class_from_global_cache) => {
-                    self.class_hash_to_class.insert(*class_hash, contract_class_from_global_cache);
+                    return Ok(contract_class_from_global_cache)
                 }
                 None => {
                     let contract_class_from_db =
                         self.state.get_compiled_contract_class(class_hash)?;
-                    self.class_hash_to_class.insert(*class_hash, contract_class_from_db);
+                        return Ok(contract_class_from_db)
                 }
             }
         }
