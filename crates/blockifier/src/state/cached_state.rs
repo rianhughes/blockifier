@@ -599,6 +599,18 @@ impl<'a, S: State> TransactionalState<'a, S> {
         let state = self.state.0;
         let child_cache = self.cache;
 
+        self.class_hash_to_class.iter().for_each( | (class_hash, contract_class) | {
+            state.set_contract_class(class_hash, contract_class.clone()).expect("Committing class_hash_to_class");
+        });
+        child_cache.compiled_class_hash_writes.iter().for_each( | (class_hash, compiled_class_hash) | {
+            state.set_compiled_class_hash(*class_hash, *compiled_class_hash).expect("Committing compiled_class_hash_writes");
+        });
+        child_cache.class_hash_writes.iter().for_each( | (contract_address, class_hash) | {
+            state.set_class_hash_at(*contract_address, *class_hash).expect("Committing class_hash_writes")
+        });
+        child_cache.storage_writes.iter().for_each( | (storage_address, value) | {
+            state.set_storage_at(storage_address.0, storage_address.1, *value);
+        });
         child_cache.nonce_writes.iter().for_each( | (contract_address, nonce) | {
             let previous_nonce = state.get_nonce_at(*contract_address).expect("Getting current nonce");
             let previous_nonce_ff: FieldElement = previous_nonce.0.into();
@@ -609,18 +621,6 @@ impl<'a, S: State> TransactionalState<'a, S> {
                 state.increment_nonce(*contract_address).expect("Incrementing nonce");
                 increments = increments - FieldElement::ONE;
             }
-        });
-        child_cache.class_hash_writes.iter().for_each( | (contract_address, class_hash) | {
-            state.set_class_hash_at(*contract_address, *class_hash).expect("Committing class_hash_writes")
-        });
-        child_cache.storage_writes.iter().for_each( | (storage_address, value) | {
-            state.set_storage_at(storage_address.0, storage_address.1, *value);
-        });
-        child_cache.compiled_class_hash_writes.iter().for_each( | (class_hash, compiled_class_hash) | {
-            state.set_compiled_class_hash(*class_hash, *compiled_class_hash).expect("Committing compiled_class_hash_writes");
-        });
-        self.class_hash_to_class.iter().for_each( | (class_hash, contract_class) | {
-            state.set_contract_class(class_hash, contract_class.clone()).expect("Committing class_hash_to_class");
         });
     }
 
