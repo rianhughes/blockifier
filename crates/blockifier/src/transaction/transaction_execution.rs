@@ -9,7 +9,7 @@ use crate::execution::contract_class::ClassInfo;
 use crate::execution::entry_point::EntryPointExecutionContext;
 use crate::fee::actual_cost::ActualCost;
 use crate::state::cached_state::TransactionalState;
-use crate::state::state_api::StateReader;
+use crate::state::state_api::State;
 use crate::transaction::account_transaction::AccountTransaction;
 use crate::transaction::errors::TransactionFeeError;
 use crate::transaction::objects::{
@@ -90,6 +90,7 @@ impl Transaction {
     }
 }
 
+<<<<<<< HEAD
 impl TransactionInfoCreator for Transaction {
     fn create_tx_info(&self) -> TransactionInfo {
         match self {
@@ -100,6 +101,9 @@ impl TransactionInfoCreator for Transaction {
 }
 
 impl<S: StateReader> ExecutableTransaction<S> for L1HandlerTransaction {
+=======
+impl<S: State> ExecutableTransaction<S> for L1HandlerTransaction {
+>>>>>>> omer/omerfirmak/allow-generic-state-execution
     fn execute_raw(
         self,
         state: &mut TransactionalState<'_, S>,
@@ -142,7 +146,7 @@ impl<S: StateReader> ExecutableTransaction<S> for L1HandlerTransaction {
     }
 }
 
-impl<S: StateReader> ExecutableTransaction<S> for Transaction {
+impl<S: State> ExecutableTransaction<S> for Transaction {
     fn execute_raw(
         self,
         state: &mut TransactionalState<'_, S>,

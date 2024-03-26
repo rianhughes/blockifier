@@ -39,7 +39,7 @@ use crate::fee::fee_utils::calculate_tx_fee;
 use crate::fee::gas_usage::{
     estimate_minimal_gas_vector, get_da_gas_cost, get_onchain_data_segment_length,
 };
-use crate::state::cached_state::{CachedState, StateChangesCount};
+use crate::state::cached_state::{CachedState, StateChangesCount, TransactionalState};
 use crate::state::errors::StateError;
 use crate::state::state_api::{State, StateReader};
 use crate::test_utils::contracts::FeatureContract;
@@ -1005,9 +1005,20 @@ fn test_actual_fee_gt_resource_bounds(account_cairo_version: CairoVersion) {
     assert_eq!(execution_result.actual_fee, minimal_fee);
 }
 
+<<<<<<< HEAD
 #[test_case(CairoVersion::Cairo0; "With Cairo0 account")]
 #[test_case(CairoVersion::Cairo1; "With Cairo1 account")]
 fn test_invalid_nonce(account_cairo_version: CairoVersion) {
+=======
+#[test_case(
+    &mut create_state_with_trivial_validation_account();
+    "With Cairo0 account")]
+#[test_case(
+    &mut create_state_with_cairo1_account();
+    "With Cairo1 account")]
+fn test_invalid_nonce(state: &mut CachedState<DictStateReader>) {
+    let mut transactional_state = TransactionalState::new_transactional(state);
+>>>>>>> omer/omerfirmak/allow-generic-state-execution
     let block_context = &BlockContext::create_for_account_testing();
     let account_contract = FeatureContract::AccountWithoutValidations(account_cairo_version);
     let test_contract = FeatureContract::TestContract(CairoVersion::Cairo0);
